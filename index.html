@@ -35,9 +35,8 @@
     <nav class="navbar navbar-expand-lg navbar-white bg-white border-bottom mb-4">
         <div class="container">
             <a class="navbar-brand" onclick="app.showView('weekly')">🍅 Pomodoro Stats</a>
-            <div class="navbar-nav">
-              <a class="nav-link" id="nav-monthly" onclick="app.showView('monthly')">Monthly Heatmap</a>
-              <a class="nav-link text-primary fw-bold" onclick="app.showView('add')">+ Log Session</a>
+            <div class="navbar-nav align-items-right">
+              <a class="nav-link" id="nav-monthly" onclick="app.showView('monthly')">Overview</a>
             </div>
             <div class="ms-auto">
                 <button class="btn btn-sm btn-outline-secondary me-2" onclick="app.exportData()">Export</button>
@@ -63,7 +62,8 @@
                     </div>
                 </div>
 
-                <div id="timeline-main" class="timeline-container border" style="height: 120px;">
+                <div id="timeline-main" class="timeline-container border position-relative" style="height: 120px;">
+                    <button class="btn btn-primary btn-sm position-absolute top-0 end-0 m-2" style="z-index: 5;" onclick="app.showView('add')"> + </button>
                     <canvas id="mainTimelineChart"></canvas>
                 </div>
 
@@ -114,7 +114,7 @@
             <div class="row justify-content-center">
                 <div class="col-md-6">
                     <div class="card p-4">
-                        <h4 class="mb-4">📝 Log Session</h4>
+                        <h4 id="form-title" class="mb-4">📝 Log Session</h4>
                         <form id="sessionForm">
                             <div class="mb-3">
                                 <label class="form-label font-weight-bold">Date</label>
@@ -139,7 +139,7 @@
                                 <input type="number" id="form-quality" class="form-control" min="1" max="10" placeholder="Optional">
                             </div>
                             <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">Save Session</button>
+                                <button type="submit" id="submit-btn" class="btn btn-primary">Save Session</button>
                                 <button type="button" class="btn btn-outline-secondary" onclick="app.showView('weekly')">Cancel</button>
                             </div>
                         </form>
@@ -149,6 +149,23 @@
         </section>
     </div>
 
+    <!-- Action Modal -->
+    <div class="modal fade" id="sessionActionModal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Session Actions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body d-grid gap-2">
+                    <button class="btn btn-primary" id="btn-edit-session">Edit Session</button>
+                    <button class="btn btn-danger" id="btn-delete-session">Delete Session</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

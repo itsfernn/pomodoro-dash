@@ -11,11 +11,14 @@ const app = {
     currentMonth: new Date().getMonth(),
     currentYear: new Date().getFullYear(),
     firstLoad: true,
+    editingId: null,
 
     charts: {
         dashboard: null,
         timeline: null
     },
+
+    modal: null,
 
     // --- Initialization ---
     init() {
@@ -26,6 +29,7 @@ const app = {
         this.initEventListeners();
         this.updateView();
         this.firstLoad = false;
+        this.modal = new bootstrap.Modal(document.getElementById('sessionActionModal'));
     },
 
     // Helper to get Sunday of the week containing the date
@@ -85,15 +89,29 @@ const app = {
         const duration = parseInt(document.getElementById('form-duration').value);
         const quality = parseInt(document.getElementById('form-quality').value) || null;
 
-        const session = {
-            id: Date.now(),
-            date,
-            start_time: startTime,
-            duration_min: duration,
-            quality
-        };
-
-        this.sessions.push(session);
+        if (this.editingId) {
+            const index = this.sessions.findIndex(s => s.id === this.editingId);
+            if (index !== -1) {
+                this.sessions[index] = {
+                    ...this.sessions[index],
+                    date,
+                    start_time: startTime,
+                    duration_min: duration,
+                    quality
+                };
+            }
+            this.editingId = null;
+        } else {
+            const session = {
+                id: Date.now(),
+                date,
+                start_time: startTime,
+                duration_min: duration,
+                quality
+            };
+            this.sessions.push(session);
+        }
+        
         this.saveData();
         this.showView('weekly');
     },
@@ -139,12 +157,37 @@ const app = {
         }
 
         if (viewName === 'add') {
-            const now = new Date();
-            document.getElementById('form-date').value = this.formatDate(now);
-            document.getElementById('form-start').value = this.formatTime(new Date(now.getTime() - 25 * 60000));
-            document.getElementById('form-end').value = this.formatTime(now);
-            document.getElementById('form-duration').value = 25;
-            document.getElementById('form-quality').value = '';
+            const formTitle = document.getElementById('form-title');
+            const submitBtn = document.getElementById('submit-btn');
+
+            if (params.id) {
+                this.editingId = params.id;
+                const session = this.sessions.find(s => s.id === params.id);
+                document.getElementById('form-date').value = session.date;
+                document.getElementById('form-start').value = session.start_time;
+                document.getElementById('form-duration').value = session.duration_min;
+                document.getElementById('form-quality').value = session.quality || '';
+                
+                // Trigger end time calculation
+                const startMins = this.timeToMinutes(session.start_time);
+                document.getElementById('form-end').value = this.minutesToTime(startMins + session.duration_min);
+                
+                formTitle.innerText = '📝 Edit Session';
+                submitBtn.innerText = 'Update Session';
+            } else {
+                this.editingId = null;
+                // Initialize with the currently selected date instead of today
+                document.getElementById('form-date').value = this.formatDate(this.selectedDate);
+                
+                const now = new Date();
+                document.getElementById('form-start').value = this.formatTime(new Date(now.getTime() - 25 * 60000));
+                document.getElementById('form-end').value = this.formatTime(now);
+                document.getElementById('form-duration').value = 25;
+                document.getElementById('form-quality').value = '';
+                
+                formTitle.innerText = '📝 Log Session';
+                submitBtn.innerText = 'Save Session';
+            }
         }
 
         document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
@@ -155,6 +198,27 @@ const app = {
         if (nav) nav.classList.add('active');
 
         this.updateView();
+    },
+
+    handleSessionClick(id) {
+        const btnEdit = document.getElementById('btn-edit-session');
+        const btnDelete = document.getElementById('btn-delete-session');
+        
+        btnEdit.onclick = () => {
+            this.modal.hide();
+            this.showView('add', { id });
+        };
+        
+        btnDelete.onclick = () => {
+            if (confirm('Are you sure you want to delete this session?')) {
+                this.sessions = this.sessions.filter(s => s.id !== id);
+                this.saveData();
+                this.modal.hide();
+                this.renderDashboard();
+            }
+        };
+        
+        this.modal.show();
     },
 
     updateView() {
@@ -317,6 +381,12 @@ const app = {
                     x: { min: 6, max: 22, ticks: { stepSize: 2, callback: v => v + ":00" } },
                     y: { display: false }
                 },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const sessionData = this.charts.timeline.data.datasets[0].data[elements[0].index];
+                        this.handleSessionClick(sessionData.id);
+                    }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -413,6 +483,7 @@ const app = {
             else if (s.quality <= 3 && s.quality !== null) color = 'rgba(220, 53, 69, 0.7)'; // Danger Red
 
             return {
+                id: s.id,
                 x: [startDecimal, endDecimal],
                 y: 'Sessions',
                 quality: s.quality || '-',
