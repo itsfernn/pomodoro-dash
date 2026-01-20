@@ -148,12 +148,25 @@ const app = {
 
     // --- View Routing ---
     showView(viewName, params = {}) {
+        const previousView = this.currentView;
         this.currentView = viewName;
         
+        let shouldAnimate = false;
+
         // Handle params
         if (params.date) {
             this.selectedDate = this.parseDate(params.date);
             this.windowEndDate = this.getEndOfWeek(this.selectedDate);
+        } else if (viewName === 'weekly') {
+            // Reset to initial conditions if no date param (Home button behavior)
+            const now = new Date();
+            this.selectedDate = new Date(now);
+            this.selectedDate.setHours(0,0,0,0);
+            this.windowEndDate = new Date(this.selectedDate);
+            this.currentMonth = now.getMonth();
+            this.currentYear = now.getFullYear();
+            this.firstLoad = true;
+            shouldAnimate = true;
         }
 
         if (viewName === 'add') {
@@ -198,6 +211,10 @@ const app = {
         if (nav) nav.classList.add('active');
 
         this.updateView();
+
+        if (shouldAnimate) {
+            this.firstLoad = false;
+        }
     },
 
     handleSessionClick(id) {
