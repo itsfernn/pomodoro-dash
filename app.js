@@ -423,7 +423,10 @@ const app = {
                 datasets: [{
                     data: timelineData,
                     backgroundColor: timelineData.map(d => d.color),
-                    borderWidth: 1
+                    borderWidth: 1,
+                    borderRadius: {topLeft: 5, topRight: 5, bottomLeft: 5, bottomRight: 5},
+                    barPercentage: 3.0,
+                     borderSkipped: false,
                 }]
             },
             options: {
