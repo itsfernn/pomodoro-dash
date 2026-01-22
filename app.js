@@ -279,9 +279,14 @@ const app = {
 
     renderDashboard() {
         const selectedDateStr = this.formatDate(this.selectedDate);
-        
-        document.getElementById('selectedDayDisplay').innerText = 
-            this.selectedDate.toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
+
+        const isMobile = window.innerWidth < 600;
+
+        document.getElementById('selectedDayDisplay').innerText =
+            this.selectedDate.toLocaleDateString(undefined, isMobile
+                ? { month: 'short', day: 'numeric', year: 'numeric' }
+                : { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
+            );
 
         const end = new Date(this.windowEndDate);
         const start = new Date(end);
