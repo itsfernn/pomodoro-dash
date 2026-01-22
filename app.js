@@ -12,13 +12,16 @@ const app = {
     currentYear: new Date().getFullYear(),
     firstLoad: true,
     editingId: null,
+    settings: {
+        defaultDuration: 25
+    },
 
     charts: {
         dashboard: null,
         timeline: null
     },
 
-    modal: null,
+    addSessionModal: null,
 
     // --- Initialization ---
     init() {
@@ -26,10 +29,13 @@ const app = {
         // Initial load shows the 7 days ending today
         this.windowEndDate = new Date(this.selectedDate);
         this.loadData();
+        this.loadSettings();
         this.initEventListeners();
         this.updateView();
         this.firstLoad = false;
-        this.modal = new bootstrap.Modal(document.getElementById('sessionActionModal'));
+        
+        // Use getOrCreateInstance to avoid multiple instances if data-attributes are also used
+        this.addSessionModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addSessionModal'));
     },
 
     // Helper to get Sunday of the week containing the date
@@ -42,11 +48,6 @@ const app = {
     },
 
     initEventListeners() {
-        const form = document.getElementById('sessionForm');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveSession();
-        });
 
         const durationInput = document.getElementById('form-duration');
         const startInput = document.getElementById('form-start');
@@ -67,6 +68,15 @@ const app = {
         startInput.addEventListener('change', updateEnd);
         endInput.addEventListener('change', updateStart);
         durationInput.addEventListener('input', updateStart);
+
+        const form = document.getElementById('sessionForm');
+
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.saveSession();
+          this.addSessionModal.hide();
+        });
+
     },
 
     // --- Data Management ---
@@ -81,6 +91,29 @@ const app = {
 
     saveData() {
         localStorage.setItem('pomodoro_sessions', JSON.stringify(this.sessions));
+    },
+
+    loadSettings() {
+        const stored = localStorage.getItem('pomodoro_settings');
+        if (stored) {
+            try {
+                this.settings = { ...this.settings, ...JSON.parse(stored) };
+            } catch (e) {
+                console.error("Error parsing settings", e);
+            }
+        }
+        this.applySettings();
+    },
+
+    saveSettings() {
+        const duration = parseInt(document.getElementById('settings-form-duration').value);
+        this.settings.defaultDuration = duration;
+        localStorage.setItem('pomodoro_settings', JSON.stringify(this.settings));
+        this.applySettings();
+    },
+
+    applySettings() {
+        document.getElementById('settings-form-duration').value = this.settings.defaultDuration;
     },
 
     saveSession() {
@@ -113,7 +146,7 @@ const app = {
         }
         
         this.saveData();
-        this.showView('weekly');
+        this.updateView();
     },
 
     exportData() {
@@ -147,7 +180,11 @@ const app = {
     },
 
     clearData() {
-      this.sessions = [];
+      if (confirm('Are you sure you want to delete ALL session data? This cannot be undone.')) {
+          this.sessions = [];
+          this.saveData();
+          this.updateView();
+      }
     },
 
     // --- View Routing ---
@@ -155,89 +192,82 @@ const app = {
         const previousView = this.currentView;
         this.currentView = viewName;
         
-        let shouldAnimate = false;
-
         // Handle params
         if (params.date) {
             this.selectedDate = this.parseDate(params.date);
             this.windowEndDate = this.getEndOfWeek(this.selectedDate);
         } else if (viewName === 'weekly') {
-            // Reset to initial conditions if no date param (Home button behavior)
             const now = new Date();
+            this.firstLoad = true;
             this.selectedDate = new Date(now);
             this.selectedDate.setHours(0,0,0,0);
             this.windowEndDate = new Date(this.selectedDate);
             this.currentMonth = now.getMonth();
             this.currentYear = now.getFullYear();
-            this.firstLoad = true;
-            shouldAnimate = true;
         }
 
-        if (viewName === 'add') {
-            const formTitle = document.getElementById('form-title');
-            const submitBtn = document.getElementById('submit-btn');
-
-            if (params.id) {
-                this.editingId = params.id;
-                const session = this.sessions.find(s => s.id === params.id);
-                document.getElementById('form-date').value = session.date;
-                document.getElementById('form-start').value = session.start_time;
-                document.getElementById('form-duration').value = session.duration_min;
-                document.getElementById('form-quality').value = session.quality || '';
-                
-                // Trigger end time calculation
-                const startMins = this.timeToMinutes(session.start_time);
-                document.getElementById('form-end').value = this.minutesToTime(startMins + session.duration_min);
-                
-                formTitle.innerText = '📝 Edit Session';
-                submitBtn.innerText = 'Update Session';
-            } else {
-                this.editingId = null;
-                // Initialize with the currently selected date instead of today
-                document.getElementById('form-date').value = this.formatDate(this.selectedDate);
-                
-                const now = new Date();
-                document.getElementById('form-start').value = this.formatTime(new Date(now.getTime() - 25 * 60000));
-                document.getElementById('form-end').value = this.formatTime(now);
-                document.getElementById('form-duration').value = 25;
-                document.getElementById('form-quality').value = '';
-                
-                formTitle.innerText = '📝 Log Session';
-                submitBtn.innerText = 'Save Session';
-            }
-        }
 
         document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
         document.getElementById(`view-${viewName}`).classList.add('active');
+
+        this.updateView();
         
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         const nav = document.getElementById(`nav-${viewName}`);
         if (nav) nav.classList.add('active');
 
-        this.updateView();
 
-        if (shouldAnimate) {
-            this.firstLoad = false;
-        }
+        this.firstLoad = false;
     },
 
-    handleSessionClick(id) {
-        const btnEdit = document.getElementById('btn-edit-session');
-        const btnDelete = document.getElementById('btn-delete-session');
-        
-        btnEdit.onclick = () => {
-            this.modal.hide();
-            this.showView('add', { id });
-        };
-        
-        btnDelete.onclick = () => {
-              this.sessions = this.sessions.filter(s => s.id !== id);
-              this.saveData();
-              this.modal.hide();
-              this.renderDashboard();
-        };
-        
-        this.modal.show();
+    toggleSessionModal(params = {}) {
+        const formTitle = document.getElementById('sessionModalLabel');
+        const saveBtn = document.getElementById('session-save-btn');
+        const btnDelete = document.getElementById('session-delete-btn');
+        const quality_input = document.getElementById('form-quality');
+        quality_input.focus();
+
+        if (params.id) {
+            this.editingId = params.id;
+            const session = this.sessions.find(s => s.id === params.id);
+            document.getElementById('form-date').value = session.date;
+            document.getElementById('form-start').value = session.start_time;
+            document.getElementById('form-duration').value = session.duration_min;
+            document.getElementById('form-quality').value = session.quality || '';
+            
+            // Trigger end time calculation
+            const startMins = this.timeToMinutes(session.start_time);
+            document.getElementById('form-end').value = this.minutesToTime(startMins + session.duration_min);
+            
+            formTitle.innerText = '📝 Edit Session';
+            saveBtn.innerText = 'Update Session';
+
+            btnDelete.classList.remove('d-none');
+
+            btnDelete.onclick = () => {
+                this.sessions = this.sessions.filter(s => s.id !== params.id);
+                this.saveData();
+                this.renderDashboard();
+            };
+
+        } else {
+            this.editingId = null;
+            // Initialize with the currently selected date instead of today
+            document.getElementById('form-date').value = this.formatDate(this.selectedDate);
+            
+            const now = new Date();
+            document.getElementById('form-start').value = this.formatTime(new Date(now.getTime() - this.settings.defaultDuration * 60000));
+            document.getElementById('form-end').value = this.formatTime(now);
+            document.getElementById('form-duration').value = this.settings.defaultDuration;
+            document.getElementById('form-quality').value = '';
+            
+            formTitle.innerText = '📝 Log Session';
+            saveBtn.innerText = 'Save Session';
+
+            btnDelete.classList.add('d-none');
+        }
+
+        this.addSessionModal.show();
     },
 
     updateView() {
@@ -397,13 +427,13 @@ const app = {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { min: 6, max: 22, ticks: { stepSize: 2, callback: v => v + ":00" } },
+                    x: { min: 6, max: 20, ticks: { stepSize: 2, callback: v => v + ":00" } },
                     y: { display: false }
                 },
                 onClick: (e, elements) => {
                     if (elements.length > 0) {
                         const sessionData = this.charts.timeline.data.datasets[0].data[elements[0].index];
-                        this.handleSessionClick(sessionData.id);
+                        this.toggleSessionModal({ id: sessionData.id });
                     }
                 },
                 plugins: {
@@ -497,9 +527,10 @@ const app = {
             const durationHours = s.duration_min / 60;
             const endDecimal = startDecimal + durationHours;
 
-            let color = 'rgba(255, 193, 7, 0.7)'; // Warning Yellow
+            let color = 'rgba(115, 115, 115, 0.7)'; // Warning Yellow
             if (s.quality >= 7) color = 'rgba(25, 135, 84, 0.7)'; // Success Green
             else if (s.quality <= 3 && s.quality !== null) color = 'rgba(220, 53, 69, 0.7)'; // Danger Red
+            else if (s.quality >=4 && s.quality <=6) color = 'rgba(255, 193, 7, 0.7)'; // Warning Yellow
 
             return {
                 id: s.id,

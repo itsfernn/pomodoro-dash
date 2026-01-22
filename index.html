@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pomodoro Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #f8f9fa; }
@@ -29,12 +30,15 @@
         
         /* Timeline Styles */
         .timeline-container { height: 100px; background: white; border-radius: 8px; padding: 10px; }
+        .floating-btn { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); z-index: 1050;  }
     </style>
 </head>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
 <body>
     <nav class="navbar navbar-expand-lg navbar-white bg-white border-bottom mb-4">
         <div class="container">
-            <a class="navbar-brand" href="" onclick="app.showView('weekly')">🍅 Pomodoro Stats</a>
+            <a class="navbar-brand" href="#" onclick="app.showView('weekly')">🍅 Pomodoro Stats</a>
             <div class="navbar-nav align-items-right">
               <a class="nav-link" id="nav-monthly" onclick="app.showView('monthly')">Overview</a>
             </div>
@@ -42,9 +46,13 @@
               <button type="button" class="btn btn-link p-0 border-0" data-bs-toggle="modal" data-bs-target="#settingsModal" aria-label="Settings" >
                 <i class="bi bi-gear-fill fs-3 text-secondary"></i>
               </button>
-            <div>
+            </div>
         </div>
     </nav>
+
+  <button class="btn btn-primary rounded-circle floating-btn" data-bs-toggle="modal" data-bs-target="#addSessionModal" onclick="app.toggleSessionModal()">
+    <i class="bi bi-plus"></i>
+  </button>
 
     <div class="container">
         <!-- Main Dashboard View -->
@@ -63,7 +71,7 @@
                 </div>
 
                 <div id="timeline-main" class="timeline-container border position-relative" style="height: 120px;">
-                    <button class="btn btn-primary btn-sm position-absolute top-0 end-0 m-2" style="z-index: 5;" onclick="app.showView('add')"> + </button>
+
                     <canvas id="mainTimelineChart"></canvas>
                 </div>
 
@@ -109,66 +117,54 @@
             </div>
         </section>
 
-        <!-- Add View -->
-        <section id="view-add" class="view-section">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="card p-4">
-                        <h4 id="form-title" class="mb-4">📝 Log Session</h4>
-                        <form id="sessionForm">
-                            <div class="mb-3">
-                                <label class="form-label font-weight-bold">Date</label>
-                                <input type="date" id="form-date" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label font-weight-bold">Duration (minutes)</label>
-                                <input type="number" id="form-duration" class="form-control" value="25" required>
-                            </div>
-                            <div class="row">
-                                <div class="col-6 mb-3">
-                                    <label class="form-label">Start Time</label>
-                                    <input type="time" id="form-start" class="form-control" required>
-                                </div>
-                                <div class="col-6 mb-3">
-                                    <label class="form-label">End Time</label>
-                                    <input type="time" id="form-end" class="form-control">
-                                </div>
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Quality (1-10)</label>
-                                <input type="number" id="form-quality" class="form-control" min="1" max="10" placeholder="Optional">
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" id="submit-btn" class="btn btn-primary">Save Session</button>
-                                <button type="button" class="btn btn-outline-secondary" onclick="app.showView('weekly')">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </section>
     </div>
 
-    <!-- Session Modal -->
-    <div class="modal fade" id="sessionActionModal" tabindex="-1">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+    <!-- Add/Edit Session Modal -->
+    <div class="modal fade" id="addSessionModal" tabindex="-1" aria-labelledby="sessionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Session Actions</h5>
+                    <h5 class="modal-title" id="sessionModalLabel">📝 Log Session</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body d-grid gap-2">
-                    <button class="btn btn-primary" id="btn-edit-session">Edit Session</button>
-                    <button class="btn btn-danger" id="btn-delete-session">Delete Session</button>
+                <div class="modal-body">
+                    <form id="sessionForm">
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold">Date</label>
+                            <input type="date" id="form-date" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold">Duration (minutes)</label>
+                            <input type="number" id="form-duration" class="form-control" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" id="form-start" class="form-control" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">End Time</label>
+                                <input type="time" id="form-end" class="form-control">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Quality (1-10)</label>
+                            <input type="number" id="form-quality" class="form-control" min="1" max="10" value="1" placeholder="Optional">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" id="session-save-btn" class="btn btn-primary"> Save Session </button>
+                            <button type="button" id="session-delete-btn" class="btn btn-danger d-none" data-bs-dismiss="modal">Delete Session </button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
-
     <!-- Settings Modal -->
 <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-sm modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
 
       <div class="modal-header">
@@ -183,12 +179,11 @@
           <label for="settings-form-duration" class="form-label">
             Duration (minutes)
           </label>
-          <input
+            <input
             type="number"
             class="form-control"
             id="settings-form-duration"
             name="settings-form-duration"
-            value="25"
             min="1"
           >
         </div>
@@ -222,7 +217,5 @@
   </div>
 </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="app.js"></script>
 </body>
 </html>
