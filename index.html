@@ -29,7 +29,7 @@
         .heatmap-day.empty { background-color: #f8f9fa; border: none; }
         
         /* Timeline Styles */
-        .timeline-container { height: 100px; background: white; border-radius: 8px; padding: 10px; }
+        .timeline-container { max-height: 100px; background: white; border-radius: 8px; padding: 10px; }
         .floating-btn { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); z-index: 1050;  }
     </style>
 </head>
@@ -137,12 +137,12 @@
 
         <!-- Monthly View -->
         <section id="view-monthly" class="view-section">
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3 bg-white p-3 border rounded">
                 <button class="btn btn-outline-secondary" onclick="app.changeMonth(-1)">&larr; Prev</button>
                 <h3 id="monthDisplay" class="m-0">...</h3>
                 <button class="btn btn-outline-secondary" onclick="app.changeMonth(1)">Next &rarr;</button>
             </div>
-            <div class="card p-4">
+            <div class="card p-4 border">
                 <div class="heatmap-grid mb-2">
                     <div class="text-center fw-bold">Mon</div>
                     <div class="text-center fw-bold">Tue</div>
