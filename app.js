@@ -227,12 +227,10 @@ const app = {
         };
         
         btnDelete.onclick = () => {
-            if (confirm('Are you sure you want to delete this session?')) {
-                this.sessions = this.sessions.filter(s => s.id !== id);
-                this.saveData();
-                this.modal.hide();
-                this.renderDashboard();
-            }
+              this.sessions = this.sessions.filter(s => s.id !== id);
+              this.saveData();
+              this.modal.hide();
+              this.renderDashboard();
         };
         
         this.modal.show();
