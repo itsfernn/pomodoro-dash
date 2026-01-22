@@ -13,13 +13,17 @@
         .nav-link { color: #495057; font-weight: 500; cursor: pointer; }
         .nav-link.active { color: #0d6efd; font-weight: bold; }
         .stat-val { font-size: 1.2rem; font-weight: bold; }
+        @media (max-width: 576px){ .navbar { margin-bottom: 5px !important; }}
         
         .view-section { display: none; }
         .view-section.active { display: block; }
 
         /* Dashboard Styles */
         .dashboard-container { display: flex; flex-direction: column; max-height: calc(150vh - 200px); gap: 15px; }
-        .chart-wrapper { flex: 1; min-height: 300px; position: relative; background: white; border-radius: 8px; padding: 15px; }
+        @media (max-width: 576px) { .dashboard-container { gap: 5px; }}
+        .chart-wrapper { flex: 1; min-height: 300px; position: relative; background: white; border-radius: 8px; padding: 10px;}
+        @media (max-width: 576px) { .chart-wrapper { min-height: 200px }}
+}
         .table-wrapper { background: white; border-radius: 8px; padding: 10px; overflow-y: auto; }
         
         /* Heatmap Styles */
@@ -29,7 +33,7 @@
         .heatmap-day.empty { background-color: #f8f9fa; border: none; }
         
         /* Timeline Styles */
-        .timeline-container { max-height: 100px; background: white; border-radius: 8px; padding: 10px; }
+        .timeline-container { max-height: 80px; background: white; border-radius: 8px; padding: 5px; }
         .floating-btn { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); z-index: 1050;  }
     </style>
 </head>
@@ -118,7 +122,7 @@
           <canvas id="pomodoroChart"></canvas>
         </div>
 
-        <div class="table-wrapper border">
+        <div class="table-wrapper border rounded p-1">
           <table class="table table-sm table-hover">
             <thead class="table-light">
               <tr>
