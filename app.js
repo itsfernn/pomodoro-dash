@@ -146,6 +146,10 @@ const app = {
         reader.readAsText(file);
     },
 
+    clearData() {
+      this.sessions = [];
+    },
+
     // --- View Routing ---
     showView(viewName, params = {}) {
         const previousView = this.currentView;
