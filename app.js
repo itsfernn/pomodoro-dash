@@ -12,6 +12,8 @@ const app = {
     currentYear: new Date().getFullYear(),
     firstLoad: true,
     editingId: null,
+    timerStart: null,
+    timerRunning: false,
     settings: {
         defaultDuration: 25,
         timelineStartHour: 6,
@@ -38,6 +40,7 @@ const app = {
         
         // Use getOrCreateInstance to avoid multiple instances if data-attributes are also used
         this.addSessionModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addSessionModal'));
+        this.updateTimerButton();
     },
 
     // Helper to get Sunday of the week containing the date
@@ -196,6 +199,54 @@ const app = {
       }
     },
 
+    // --- Timer ---
+    toggleTimer() {
+        this.timerRunning ? this.stopTimer() : this.startTimer();
+    },
+
+    startTimer() {
+        this.timerStart = new Date();
+        this.timerRunning = true;
+        this.updateTimerButton();
+        console.log('Timer started at', this.timerStart);
+    },
+
+    stopTimer() {
+        if (!this.timerStart) return;
+
+        const end = new Date();
+        const duration = Math.max(
+            1,
+            Math.round((end - this.timerStart) / 60000)
+        );
+
+        console.log('Timer stopped at', end, 'duration:', duration);
+
+        this.timerRunning = false;
+        this.updateTimerButton();
+
+        this.toggleSessionModal({
+            date: this.formatDate(this.timerStart),
+            start: this.timerStart,
+            duration
+        });
+
+        this.timerStart = null;
+    },
+
+    updateTimerButton() {
+        const btn = document.getElementById('timer-btn');
+        if (!btn) return;
+
+        const icon = btn.querySelector('i');
+        btn.classList.remove('btn-success', 'btn-danger');
+        btn.classList.add(this.timerRunning ? 'btn-danger' : 'btn-success');
+        icon.className = this.timerRunning
+            ? 'bi bi-pause-fill'
+            : 'bi bi-play-fill';
+    },
+
+
     // --- View Routing ---
     showView(viewName, params = {}) {
         const previousView = this.currentView;
@@ -230,54 +281,71 @@ const app = {
     },
 
     toggleSessionModal(params = {}) {
-        const formTitle = document.getElementById('sessionModalLabel');
-        const saveBtn = document.getElementById('session-save-btn');
-        const btnDelete = document.getElementById('session-delete-btn');
-        const quality_input = document.getElementById('form-quality');
-        quality_input.focus();
+        const els = {
+            title: document.getElementById('sessionModalLabel'),
+            save: document.getElementById('session-save-btn'),
+            del: document.getElementById('session-delete-btn'),
+            date: document.getElementById('form-date'),
+            start: document.getElementById('form-start'),
+            end: document.getElementById('form-end'),
+            duration: document.getElementById('form-duration'),
+            quality: document.getElementById('form-quality'),
+        };
 
-        if (params.id) {
+        const isEdit = Boolean(params.id);
+        let sessionData;
+
+        if (isEdit) {
             this.editingId = params.id;
-            const session = this.sessions.find(s => s.id === params.id);
-            document.getElementById('form-date').value = session.date;
-            document.getElementById('form-start').value = session.start_time;
-            document.getElementById('form-duration').value = session.duration_min;
-            document.getElementById('form-quality').value = session.quality || '';
-            
-            // Trigger end time calculation
-            const startMins = this.timeToMinutes(session.start_time);
-            document.getElementById('form-end').value = this.minutesToTime(startMins + session.duration_min);
-            
-            formTitle.innerText = '📝 Edit Session';
-            saveBtn.innerText = 'Update Session';
+            sessionData = this.sessions.find(s => s.id === params.id);
+        } else {
+            this.editingId = null;
 
-            btnDelete.classList.remove('d-none');
+            const now = new Date();
+            const duration = params.duration ?? this.settings.defaultDuration;
+            const endTime = params.start
+                ? new Date(params.start)
+                : now;
 
-            btnDelete.onclick = () => {
+            const startTime = new Date(endTime.getTime() - duration * 60000);
+
+            sessionData = {
+                date: params.date ?? this.formatDate(this.selectedDate),
+                start_time: params.start
+                    ? this.formatTime(new Date(params.start))
+                    : this.formatTime(startTime),
+                duration_min: duration,
+                quality: '',
+            };
+        }
+
+        // Populate form
+        els.date.value = sessionData.date;
+        els.start.value = sessionData.start_time;
+        els.duration.value = sessionData.duration_min;
+        els.quality.value = sessionData.quality || '';
+
+        // Calculate end time
+        const startMins = this.timeToMinutes(sessionData.start_time);
+        els.end.value = this.minutesToTime(startMins + sessionData.duration_min);
+
+        // UI state
+        els.title.innerText = isEdit ? '📝 Edit Session' : '📝 Log Session';
+        els.save.innerText = isEdit ? 'Update Session' : 'Save Session';
+        els.del.classList.toggle('d-none', !isEdit);
+
+        if (isEdit) {
+            els.del.onclick = () => {
                 this.sessions = this.sessions.filter(s => s.id !== params.id);
                 this.saveData();
                 this.renderDashboard();
             };
-
-        } else {
-            this.editingId = null;
-            // Initialize with the currently selected date instead of today
-            document.getElementById('form-date').value = this.formatDate(this.selectedDate);
-            
-            const now = new Date();
-            document.getElementById('form-start').value = this.formatTime(new Date(now.getTime() - this.settings.defaultDuration * 60000));
-            document.getElementById('form-end').value = this.formatTime(now);
-            document.getElementById('form-duration').value = this.settings.defaultDuration;
-            document.getElementById('form-quality').value = '';
-            
-            formTitle.innerText = '📝 Log Session';
-            saveBtn.innerText = 'Save Session';
-
-            btnDelete.classList.add('d-none');
         }
 
+        els.quality.focus();
         this.addSessionModal.show();
     },
+
 
     updateView() {
         if (this.currentView === 'weekly') this.renderDashboard();

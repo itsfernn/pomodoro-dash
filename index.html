@@ -31,7 +31,11 @@
         
         /* Timeline Styles */
         .timeline-container { max-height: 100px; background: white;  padding: 5px; }
-        .floating-btn { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); z-index: 1050;  }
+
+        .floating-btn { position: fixed; bottom: 20px; width: 56px; height: 56px; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); z-index: 1050; }
+        .floating-btn.session-add { right: 20px; }
+        .floating-btn.timer { right: 90px; }
+
 
         @media (max-width: 576px){ 
           .navbar { margin-bottom: 5px !important; }
@@ -39,6 +43,7 @@
           .dashboard-container { gap: 5px }
           .chart-wrapper { min-height: 200px }
           .rounded { border-radius: 0px !important}
+          .timer-btn { right: 80px; }
         }
     </style>
 </head>
@@ -59,7 +64,10 @@
         </div>
     </nav>
 
-  <button class="btn btn-primary rounded-circle floating-btn" data-bs-toggle="modal" data-bs-target="#addSessionModal" onclick="app.toggleSessionModal()">
+  <button id="timer-btn" class="btn btn-success rounded-circle floating-btn timer " onclick="app.toggleTimer()">
+    <i class="bi bi-play-fill"></i>
+  </button>
+  <button class="btn btn-primary rounded-circle floating-btn session-add" data-bs-toggle="modal" data-bs-target="#addSessionModal" onclick="app.toggleSessionModal()">
     <i class="bi bi-plus"></i>
   </button>
 
