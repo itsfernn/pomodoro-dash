@@ -236,6 +236,34 @@
           >
         </div>
 
+        <!-- Timeline hours -->
+        <div>
+          <label for="settings-form-timeline-start" class="form-label">
+            Timeline start hour (0-23)
+          </label>
+            <input
+            type="number"
+            class="form-control"
+            id="settings-form-timeline-start"
+            name="settings-form-timeline-start"
+            min="0"
+            max="23"
+          >
+        </div>
+        <div>
+          <label for="settings-form-timeline-end" class="form-label">
+            Timeline end hour (0-23)
+          </label>
+            <input
+            type="number"
+            class="form-control"
+            id="settings-form-timeline-end"
+            name="settings-form-timeline-end"
+            min="0"
+            max="23"
+          >
+        </div>
+
         <!-- Import / Export -->
         <div class="d-flex justify-content-end gap-2">
           <button class="btn btn-sm btn-outline-secondary" onclick="app.exportData()">

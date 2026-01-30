@@ -13,7 +13,9 @@ const app = {
     firstLoad: true,
     editingId: null,
     settings: {
-        defaultDuration: 25
+        defaultDuration: 25,
+        timelineStartHour: 6,
+        timelineEndHour: 20
     },
 
     charts: {
@@ -107,13 +109,20 @@ const app = {
 
     saveSettings() {
         const duration = parseInt(document.getElementById('settings-form-duration').value);
-        this.settings.defaultDuration = duration;
+        const timelineStartHour = parseInt(document.getElementById('settings-form-timeline-start').value);
+        const timelineEndHour = parseInt(document.getElementById('settings-form-timeline-end').value);
+        if (!isNaN(duration)) this.settings.defaultDuration = duration;
+        if (!isNaN(timelineStartHour)) this.settings.timelineStartHour = timelineStartHour;
+        if (!isNaN(timelineEndHour)) this.settings.timelineEndHour = timelineEndHour;
         localStorage.setItem('pomodoro_settings', JSON.stringify(this.settings));
         this.applySettings();
+        this.updateView();
     },
 
     applySettings() {
         document.getElementById('settings-form-duration').value = this.settings.defaultDuration;
+        document.getElementById('settings-form-timeline-start').value = this.settings.timelineStartHour;
+        document.getElementById('settings-form-timeline-end').value = this.settings.timelineEndHour;
     },
 
     saveSession() {
@@ -413,6 +422,24 @@ const app = {
         const daySessions = this.sessions.filter(s => s.date === dateStr);
         const timelineData = this.prepareTimelineData(daySessions);
         
+        const startHour = this.settings.timelineStartHour;
+        const endHour = this.settings.timelineEndHour;
+        const configuredMin = Math.min(startHour, endHour);
+        const configuredMax = Math.max(startHour, endHour);
+        
+        let displayMin = configuredMin;
+        let displayMax = configuredMax;
+
+        if (timelineData.length > 0) {
+          const starts = timelineData.map(s => s.x[0]);
+          const ends   = timelineData.map(s => s.x[1]);
+
+          const minSessionStart = Math.min(...starts);
+          const maxSessionEnd   = Math.max(...ends);
+          displayMin = Math.min(configuredMin, Math.floor(minSessionStart - 0.5));
+          displayMax = Math.max(configuredMax, Math.ceil(maxSessionEnd + 0.5));
+        }
+        
         const ctx = document.getElementById('mainTimelineChart').getContext('2d');
         if (this.charts.timeline) this.charts.timeline.destroy();
 
@@ -435,7 +462,7 @@ const app = {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { min: 6, max: 20, ticks: { stepSize: 2, callback: v => v + ":00" } },
+                     x: { min: displayMin, max: displayMax, ticks: { stepSize: 2, callback: v => v + ":00" } },
                     y: { display: false }
                 },
                 onClick: (e, elements) => {
