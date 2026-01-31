@@ -456,7 +456,10 @@ const app = {
                         this.selectedDate = targetDate;
                         this.renderDashboard();
                     }
-                }
+                },
+                onHover: (e, elements) => {
+                  e.native.target.style.cursor = elements.length > 0 ? 'pointer': 'default';
+                },
             }
         });
     },
@@ -538,6 +541,9 @@ const app = {
                         const sessionData = this.charts.timeline.data.datasets[0].data[elements[0].index];
                         this.toggleSessionModal({ id: sessionData.id });
                     }
+                },
+                onHover: (e, elements) => {
+                  e.native.target.style.cursor = elements.length > 0 ? 'pointer': 'default';
                 },
                 plugins: {
                     legend: { display: false },
