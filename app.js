@@ -2,9 +2,56 @@
  * Pomodoro Stats - Static SPA App Logic
  */
 
+Coloris({
+  theme: 'default',
+  themeMode: 'light',
+  alpha: false,
+});
+
+
+function stringToColor(str) {
+    let hash = 0x811c9dc5; // FNV-1a offset basis
+
+    for (let i = 0; i < str.length; i++) {
+        hash ^= str.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193); // FNV prime
+    }
+
+  // Hue: 0–360
+  const hue = Math.abs(hash) % 360;
+
+  // Force vibrant values
+  const saturation = 30 + (Math.abs(hash) % 20); // 75–94%
+  const lightness = 40 + (Math.abs(hash >> 3) % 10); // 45–54%
+
+  return hslToHex(hue, saturation, lightness);
+}
+
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n =>
+    Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+
+  const r = f(0);
+  const g = f(8);
+  const b = f(4);
+
+  return (
+    "#" +
+    [r, g, b]
+      .map(x => x.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
 const app = {
     // --- State ---
     sessions: [],
+    project_colors: new Map(),
     currentView: 'weekly',
     selectedDate: new Date(),
     windowEndDate: new Date(),
@@ -12,14 +59,16 @@ const app = {
     currentYear: new Date().getFullYear(),
     firstLoad: true,
     editingId: null,
-    timerStart: null,
-    timerRunning: false,
     settings: {
         defaultDuration: 25,
         timelineStartHour: 6,
         timelineEndHour: 20
     },
-
+    timer: {
+        running: false,
+        startTime: null,
+        project: '',
+    },
     charts: {
         dashboard: null,
         timeline: null
@@ -37,10 +86,24 @@ const app = {
         this.initEventListeners();
         this.updateView();
         this.firstLoad = false;
+        this.loadProjectColors();
         
         // Use getOrCreateInstance to avoid multiple instances if data-attributes are also used
         this.addSessionModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addSessionModal'));
-        this.updateTimerButton();
+    },
+
+    loadProjectColors() {
+        const storedColors = localStorage.getItem('project_colors');
+        if (storedColors) {
+            try {
+                const parsed = JSON.parse(storedColors); // should be { name: color, ... }
+                for (const [name, color] of Object.entries(parsed)) {
+                    this.project_colors.set(name, color);
+                }
+            } catch (e) {
+                console.warn("Failed to parse project_colors from localStorage", e);
+            }
+        }
     },
 
     // Helper to get Sunday of the week containing the date
@@ -53,7 +116,6 @@ const app = {
     },
 
     initEventListeners() {
-
         const durationInput = document.getElementById('form-duration');
         const startInput = document.getElementById('form-start');
         const endInput = document.getElementById('form-end');
@@ -78,8 +140,7 @@ const app = {
 
         form.addEventListener('submit', (e) => {
           e.preventDefault();
-          this.saveSession();
-          this.addSessionModal.hide();
+          this.saveSessionModal();
         });
 
     },
@@ -128,37 +189,43 @@ const app = {
         document.getElementById('settings-form-timeline-end').value = this.settings.timelineEndHour;
     },
 
-    saveSession() {
+    saveSessionModal() {
+        const id = document.getElementById('form-id').value;
+        const project = document.getElementById('form-project').value;
         const date = document.getElementById('form-date').value;
         const startTime = document.getElementById('form-start').value;
         const duration = parseInt(document.getElementById('form-duration').value);
-        const quality = parseInt(document.getElementById('form-quality').value) || null;
+      
+        this.saveSession(id, project, date, startTime, duration);
+        console.log(`Session ${id ? 'updated' : 'created'}:`, { id, project, date, startTime, duration });
+        this.addSessionModal.hide();
+    },
 
-        if (this.editingId) {
-            const index = this.sessions.findIndex(s => s.id === this.editingId);
-            if (index !== -1) {
-                this.sessions[index] = {
-                    ...this.sessions[index],
-                    date,
-                    start_time: startTime,
-                    duration_min: duration,
-                    quality
-                };
-            }
-            this.editingId = null;
-        } else {
-            const session = {
-                id: Date.now(),
-                date,
+    saveSession(id, project, date, startTime, duration) {
+      if (id) {
+        const index = this.sessions.findIndex(s => s.id == id);
+        if (index !== -1) {
+            this.sessions[index] = {
+                ...this.sessions[index],
+                project: project,
+                date: date,
                 start_time: startTime,
                 duration_min: duration,
-                quality
             };
-            this.sessions.push(session);
         }
-        
-        this.saveData();
-        this.updateView();
+      } else {
+        const session = {
+            id: Date.now(),
+            project: project,
+            date: date,
+            start_time: startTime,
+            duration_min: duration,
+        };
+        console.log("Saving new session:", session);
+        this.sessions.push(session);
+      }
+      this.saveData();
+      this.updateView();
     },
 
     exportData() {
@@ -199,54 +266,6 @@ const app = {
       }
     },
 
-    // --- Timer ---
-    toggleTimer() {
-        this.timerRunning ? this.stopTimer() : this.startTimer();
-    },
-
-    startTimer() {
-        this.timerStart = new Date();
-        this.timerRunning = true;
-        this.updateTimerButton();
-        console.log('Timer started at', this.timerStart);
-    },
-
-    stopTimer() {
-        if (!this.timerStart) return;
-
-        const end = new Date();
-        const duration = Math.max(
-            1,
-            Math.round((end - this.timerStart) / 60000)
-        );
-
-        console.log('Timer stopped at', end, 'duration:', duration);
-
-        this.timerRunning = false;
-        this.updateTimerButton();
-
-        this.toggleSessionModal({
-            date: this.formatDate(this.timerStart),
-            start: this.timerStart,
-            duration
-        });
-
-        this.timerStart = null;
-    },
-
-    updateTimerButton() {
-        const btn = document.getElementById('timer-btn');
-        if (!btn) return;
-
-        const icon = btn.querySelector('i');
-        btn.classList.remove('btn-success', 'btn-danger');
-        btn.classList.add(this.timerRunning ? 'btn-danger' : 'btn-success');
-        icon.className = this.timerRunning
-            ? 'bi bi-pause-fill'
-            : 'bi bi-play-fill';
-    },
-
-
     // --- View Routing ---
     showView(viewName, params = {}) {
         const previousView = this.currentView;
@@ -282,24 +301,27 @@ const app = {
 
     toggleSessionModal(params = {}) {
         const els = {
+            id: document.getElementById('form-id'),
             title: document.getElementById('sessionModalLabel'),
             save: document.getElementById('session-save-btn'),
             del: document.getElementById('session-delete-btn'),
+            project: document.getElementById('form-project'),
             date: document.getElementById('form-date'),
             start: document.getElementById('form-start'),
             end: document.getElementById('form-end'),
             duration: document.getElementById('form-duration'),
-            quality: document.getElementById('form-quality'),
         };
 
         const isEdit = Boolean(params.id);
         let sessionData;
 
         if (isEdit) {
-            this.editingId = params.id;
+            els.id.value = params.id;
+            console.log("Editing session with ID:", params.id);
             sessionData = this.sessions.find(s => s.id === params.id);
+            sessionData.project = sessionData.project || 'Uncategorized';
         } else {
-            this.editingId = null;
+            els.id.value = '';
 
             const now = new Date();
             const duration = params.duration ?? this.settings.defaultDuration;
@@ -310,20 +332,20 @@ const app = {
             const startTime = new Date(endTime.getTime() - duration * 60000);
 
             sessionData = {
+                project: params.project ?? '',
                 date: params.date ?? this.formatDate(this.selectedDate),
                 start_time: params.start
                     ? this.formatTime(new Date(params.start))
                     : this.formatTime(startTime),
                 duration_min: duration,
-                quality: '',
             };
         }
 
         // Populate form
+        els.project.value = sessionData.project;
         els.date.value = sessionData.date;
         els.start.value = sessionData.start_time;
         els.duration.value = sessionData.duration_min;
-        els.quality.value = sessionData.quality || '';
 
         // Calculate end time
         const startMins = this.timeToMinutes(sessionData.start_time);
@@ -342,7 +364,6 @@ const app = {
             };
         }
 
-        els.quality.focus();
         this.addSessionModal.show();
     },
 
@@ -350,6 +371,19 @@ const app = {
     updateView() {
         if (this.currentView === 'weekly') this.renderDashboard();
         if (this.currentView === 'monthly') this.renderMonthly();
+    },
+
+    getProjectColor(projectName) {
+      if (this.project_colors.has(projectName)) {
+          return this.project_colors.get(projectName).color;
+      }
+      return stringToColor(projectName);
+    },
+
+    setProjectColor(projectName, newColor) {
+      this.project_colors.set(projectName, { color: newColor });
+      const obj = Object.fromEntries(this.project_colors);
+      localStorage.setItem('project_colors', JSON.stringify(obj));
     },
 
     // --- Rendering Logic ---
@@ -369,48 +403,43 @@ const app = {
         const start = new Date(end);
         start.setDate(start.getDate() - 6);
 
-        const stats = [];
         const chartLabels = [];
         const chartHours = [];
-        const chartQuality = [];
         const chartColors = [];
         const chartBorders = [];
+        const projects = new Map();
 
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const dateStr = this.formatDate(d);
             const daySessions = this.sessions.filter(s => s.date === dateStr);
             
-            const sessionsCount = daySessions.length;
             const totalMins = daySessions.reduce((sum, s) => sum + s.duration_min, 0);
             const totalHours = totalMins / 60;
-            const avgQuality = sessionsCount > 0 
-                ? daySessions.reduce((sum, s) => sum + (s.quality || 0), 0) / daySessions.filter(s => s.quality).length || 0
-                : 0;
-
             const isSelected = dateStr === selectedDateStr;
 
-            stats.push({
-                date: dateStr,
-                weekday: d.toLocaleDateString(undefined, { weekday: 'long' }),
-                sessions: sessionsCount,
-                hours: totalHours.toFixed(2),
-                quality: avgQuality.toFixed(1),
-                isSelected: isSelected
-            });
+            for (const s of daySessions) {
+                const projectName = s.project || 'Uncategorized';
+                if (!projects.has(projectName)) {
+                    projects.set(projectName, { color: this.getProjectColor(projectName), duration_day: 0, duration_week: 0 });
+                }
+                projects.get(projectName).duration_week += s.duration_min;
+                if (s.date === selectedDateStr) {
+                    projects.get(projectName).duration_day += s.duration_min;
+                }
+            }
 
             chartLabels.push(d.toLocaleDateString(undefined, { weekday: 'short' }));
             chartHours.push(totalHours);
-            chartQuality.push(avgQuality);
             chartColors.push(isSelected ? 'rgba(59, 104, 83, 0.9)' : 'rgba(81, 144, 114, 0.6)');
             chartBorders.push(isSelected ? 2 : 0);
         }
 
-        this.renderWeeklyChart(chartLabels, chartHours, chartQuality, chartColors, chartBorders, start);
-        this.renderWeeklyTable(stats);
+        this.renderWeeklyChart(chartLabels, chartHours,  chartColors, chartBorders, start);
+        this.renderProjectTable(projects);
         this.renderTimeline(selectedDateStr);
     },
 
-    renderWeeklyChart(labels, hours, quality, colors, borders, startDate) {
+    renderWeeklyChart(labels, hours, colors, borders, startDate) {
         const ctx = document.getElementById('pomodoroChart').getContext('2d');
         if (this.charts.dashboard) this.charts.dashboard.destroy();
 
@@ -420,15 +449,6 @@ const app = {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Quality',
-                        data: quality,
-                        type: 'line',
-                        borderColor: '#55828B',
-                        backgroundColor: '#55828B',
-                        tension: 0.3,
-                        yAxisID: 'y'
-                    },
-                    {
                         label: 'Hours',
                         type: 'bar',
                         data: hours,
@@ -436,7 +456,7 @@ const app = {
                         borderColor: '#3B6853',
                         borderWidth: borders,
                         borderRadius: 5,
-                        yAxisID: 'y1'
+                        yAxisID: 'y'
                     },
                 ]
             },
@@ -444,10 +464,7 @@ const app = {
                 animation: this.firstLoad,
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, max: 10, position: 'right', grid: { drawOnChartArea: false } },
-                    y1: { beginAtZero: true, max: 8 },
-                },
+                scales: { y: { beginAtZero: true, max: 8 } },
                 onClick: (e, elements) => {
                     if (elements.length > 0) {
                         const index = elements[0].index;
@@ -464,26 +481,38 @@ const app = {
         });
     },
 
-    renderWeeklyTable(stats) {
+
+    renderProjectTable(projects) {
         const body = document.getElementById('statsTableBody');
         body.innerHTML = '';
-        stats.reverse().forEach(row => {
-            const qualityBadge = row.quality > 0 
-                ? `<span class="badge bg-${row.quality >= 7 ? 'success' : row.quality >= 4 ? 'warning' : 'danger'}">${row.quality}</span>` 
-                : '-';
+        projects.forEach((data, name) => {
             const tr = document.createElement('tr');
-            if (row.isSelected) tr.className = 'table-primary';
-            tr.style.cursor = 'pointer';
-            tr.onclick = () => {
-                this.selectedDate = this.parseDate(row.date);
-                this.renderDashboard();
-            };
+
+            const isActive = this.timer.project === name && this.timer.isRunning;
+            const icon = isActive ? 'bi-pause-fill' : 'bi-play-fill';
+            const projectName = name || '';
+
+
             tr.innerHTML = `
-                <td class="fw-bold">${row.weekday}</td>
-                <td class="text-muted small">${row.date}</td>
-                <td class="text-center">${row.sessions}</td>
-                <td class="text-center">${row.hours}h</td>
-                <td class="text-center">${qualityBadge}</td>
+                <td>
+                    <span class="badge" 
+                          style="background-color: ${data.color}; width: 16px; height: 16px; display: inline-block; margin-right: 8px; border-radius: 4px; cursor: pointer;" 
+                          onclick="this.nextElementSibling.click()">
+                    </span>
+                    <input type="text" value="${data.color}" class="coloris-input" style="width:1px;height:1px;opacity:0;position:absolute;" data-coloris
+                           oninput="app.setProjectColor('${name}', this.value); app.renderDashboard();">
+                    ${name}
+                </td>
+                <td class="text-center">${(data.duration_week / 60).toFixed(2)}h</td>
+                <td class="text-center">${(data.duration_day / 60).toFixed(2)}h</td>
+                <td class="text-center">
+                    <button class="btn btn-secondary" onClick="app.toggleSessionModal({ project : '${projectName}'})">
+                      <i class="bi bi-plus"></i>
+                    </button>
+                    <button class="btn btn-secondary" onClick="app.toggleTimer('${projectName}')">
+                        <i class="bi ${icon}"></i>
+                    </button>
+                </td>
             `;
             body.appendChild(tr);
         });
@@ -491,6 +520,7 @@ const app = {
 
     renderTimeline(dateStr) {
         const daySessions = this.sessions.filter(s => s.date === dateStr);
+
         const timelineData = this.prepareTimelineData(daySessions);
         
         const startHour = this.settings.timelineStartHour;
@@ -551,7 +581,7 @@ const app = {
                         callbacks: {
                             label: (context) => {
                                 const d = context.raw;
-                                return ` ${d.start_time} (${d.duration} mins) | Quality: ${d.quality}`;
+                                return `${d.project}: ${d.start_time} (${d.duration} mins)`;
                             }
                         }
                     }
@@ -615,6 +645,34 @@ const app = {
         }
     },
 
+    // --- Timer Logic ---
+    toggleTimer(project) {
+      // save new session
+      if (this.timer.isRunning) {
+          this.saveSession(
+              null,
+              this.timer.project,
+              this.formatDate(new Date()),
+              this.formatTime(new Date(this.timer.startTime)),
+              Math.round((Date.now() - this.timer.startTime) / 60000)
+          );
+      }
+
+      if (this.timer.project === project) {
+          this.timer.isRunning = !this.timer.isRunning;
+
+          if (this.isRunning) {
+              this.startTime = Date.now();
+          }
+
+      } else {
+          this.timer.project = project;
+          this.timer.isRunning = true;
+          this.timer.startTime = Date.now();
+      }
+      this.renderDashboard();
+    },
+
     // --- Helpers ---
 
     parseDate(dateStr) {
@@ -635,19 +693,16 @@ const app = {
             const startDecimal = h + (m / 60);
             const durationHours = s.duration_min / 60;
             const endDecimal = startDecimal + durationHours;
-
-            let color = 'rgba(115, 115, 115, 0.7)'; // Warning Yellow
-            if (s.quality >= 7) color = 'rgba(25, 135, 84, 0.7)'; // Success Green
-            else if (s.quality <= 3 && s.quality !== null) color = 'rgba(220, 53, 69, 0.7)'; // Danger Red
-            else if (s.quality >=4 && s.quality <=6) color = 'rgba(255, 193, 7, 0.7)'; // Warning Yellow
+            const projectName = s.project || 'Uncategorized';
+            const color = this.getProjectColor(projectName);
 
             return {
                 id: s.id,
                 x: [startDecimal, endDecimal],
-                y: 'Sessions',
-                quality: s.quality || '-',
+                y: 'Session',
                 duration: s.duration_min,
                 start_time: s.start_time,
+                project: projectName,
                 color: color
             };
         });
